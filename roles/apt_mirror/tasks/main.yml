@@ -35,7 +35,9 @@
         - name: Extract components from sources.list
           ansible.builtin.set_fact:
             _debian_components: >-
-              {{ (_sources_list_content.content | b64decode | regex_search('deb\s+\S+\s+' + ansible_distribution_release + '\s+(.+)', '\1') | first | default('main')).split() | unique | join(' ') }}
+              {{ (((_sources_list_content.content | b64decode)
+                  | regex_search('(?m)^\s*deb\s+\S+\s+' + ansible_distribution_release + '\s+(.+)', '\1'))
+                 or ['main']) | first | split | unique | join(' ') }}
 
         - name: Add Debian sources
           ansible.builtin.template:
@@ -100,7 +102,11 @@
     # cache must always be refreshed against them before upgrade/install.
     update_cache: true
     upgrade: "{{ 'full' if apt_upgrade_enabled | bool else 'no' }}"
-  when: ansible_distribution in ["Ubuntu", "Debian"]
+  # A fresh PVE still has the 401ing enterprise repo when the mirror switch is
+  # off; don't run (and fail) apt update unless something actually needs it.
+  when:
+    - ansible_distribution in ["Ubuntu", "Debian"]
+    - (apt_mirror_enabled | bool) or (apt_upgrade_enabled | bool) or (packages | length > 0)
 
 - name: Install packages
   ansible.builtin.package:

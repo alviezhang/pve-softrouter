@@ -2,7 +2,7 @@
 # pve-softrouter 一键脚本 —— 在 PVE 节点的 shell 里执行:
 #   bash <(curl -fsSL https://ghfast.top/https://raw.githubusercontent.com/alviezhang/pve-softrouter/main/quickstart.sh)
 # 环境变量:
-#   GH_MIRROR  GitHub 加速前缀,默认 https://ghfast.top/;海外机器可置空:GH_MIRROR= bash <(...)
+#   GH_MIRROR  GitHub 加速前缀(须以 / 结尾),默认 https://ghfast.top/;海外机器可置空:GH_MIRROR= bash <(...)
 #   DIR        仓库检出位置,默认 /root/pve-softrouter
 set -euo pipefail
 

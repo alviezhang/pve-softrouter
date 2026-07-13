@@ -31,3 +31,6 @@ build_ignore:
   - .gitignore
   - .ansible-lint
   - "*.tar.gz"
+  - .ansible
+  - .superpowers
+  - .DS_Store

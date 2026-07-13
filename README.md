@@ -55,7 +55,7 @@ bash <(curl -fsSL https://ghfast.top/https://raw.githubusercontent.com/alviezhan
 | `archive_format` | ✓ | `zip` / `gz` / `raw` |
 | `checksum_url` | ✓ | sha256sums 地址,填 `""` 跳过校验 |
 | `onboot` | | `1` = 随宿主机自启(默认 0) |
-| `cores` | | vCPU 数(默认全部物理核) |
+| `cores` | | vCPU 数(默认宿主机全部 vCPU/逻辑核) |
 | `networks` | | 覆盖默认网卡,如 `["virtio,bridge=vmbr0", "virtio,bridge=vmbr1"]` |
 
 `vars.example.yml` 内置三个可直接取消注释的示例:OpenWrt、ImmortalWrt、RouterOS CHR。
@@ -66,14 +66,14 @@ bash <(curl -fsSL https://ghfast.top/https://raw.githubusercontent.com/alviezhan
 
 ```bash
 git clone https://github.com/alviezhang/pve-softrouter.git && cd pve-softrouter
-make provision   # 第一次会生成 inventory.yml + vars.yml,填好 PVE IP 和配置后重跑
+make provision   # 前两次运行会依次生成 vars.yml、inventory.yml,填好后第三次运行开始创建
 ```
 
 ## 作为 Ansible collection 使用
 
 ```bash
 ansible-galaxy collection install git+https://github.com/alviezhang/pve-softrouter.git
-ansible-playbook -i your-inventory alviezhang.pve_softrouter.provision -e @vars.yml
+ansible-playbook -i your-inventory alviezhang.pve_softrouter.provision -e @vars.yml -l <你的PVE主机名>
 ```
 
 或在自己的 playbook 里引用 role:`alviezhang.pve_softrouter.proxmox_vm`、

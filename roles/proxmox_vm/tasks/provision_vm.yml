@@ -130,10 +130,21 @@
       changed_when: true
 
   rescue:
+    - name: Re-read vmid state before rollback
+      ansible.builtin.command:
+        argv: [qm, config, "{{ vm.vmid }}", --current]
+      register: _vm_cfg_rescue
+      changed_when: false
+      failed_when: false
+
     - name: Roll back the VM this run created
-      # The vmid was free when this block started, so anything at it now was
-      # created by this run (including a half-created VM). Ignore "not found".
-      when: _vm_create_attempted | default(false) | bool
+      # Destroy only when the vmid now holds a VM with OUR name: a VM created
+      # by this run always has it, while a vmid grabbed by someone else during
+      # the download window (or never written by a failed qm create) does not.
+      when:
+        - _vm_create_attempted | default(false) | bool
+        - _vm_cfg_rescue.rc == 0
+        - "('name: ' ~ vm.name) in _vm_cfg_rescue.stdout_lines"
       ansible.builtin.command:
         argv: [qm, destroy, "{{ vm.vmid }}", --purge, "1", --destroy-unreferenced-disks, "1"]
       failed_when: false
