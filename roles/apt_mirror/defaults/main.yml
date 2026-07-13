@@ -1,0 +1,18 @@
+---
+# apt_mirror — point Debian + Proxmox VE apt sources at a fast mirror
+# (default: TUNA, for hosts in China) and install baseline packages.
+# Needs play-level become: true and gathered facts.
+#
+# Optional variables:
+#   apt_mirror_enabled: master switch (default true). false = leave the
+#     host's sources untouched (hosts outside China); cache update and
+#     package install still run.
+#   debian_mirror / proxmox_mirror: mirror base URLs
+#   apt_upgrade_enabled: run a full `apt upgrade` (default false — a public
+#     role must not surprise-upgrade user systems)
+#   packages: packages to install (default [])
+apt_mirror_enabled: true
+debian_mirror: https://mirrors.tuna.tsinghua.edu.cn
+proxmox_mirror: https://mirrors.tuna.tsinghua.edu.cn/proxmox
+apt_upgrade_enabled: false
+packages: []

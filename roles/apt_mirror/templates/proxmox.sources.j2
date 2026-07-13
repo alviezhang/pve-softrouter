@@ -1,0 +1,5 @@
+Types: deb
+URIs: {{ proxmox_mirror }}/debian/{{ _cfg.repo_path }}
+Suites: {{ ansible_distribution_release }}
+Components: {{ _cfg.repo_component }}
+Signed-By: /usr/share/keyrings/proxmox-archive-keyring.gpg

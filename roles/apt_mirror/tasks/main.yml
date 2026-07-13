@@ -1,0 +1,109 @@
+---
+- name: Switch apt sources to the mirror
+  when: apt_mirror_enabled | bool
+  block:
+    - name: Check if legacy sources.list exists
+      when: ansible_distribution == "Debian"
+      ansible.builtin.stat:
+        path: /etc/apt/sources.list
+      register: _sources_list
+
+    - name: Read existing sources.list
+      when:
+        - ansible_distribution == "Debian"
+        - _sources_list.stat.exists
+      ansible.builtin.slurp:
+        src: /etc/apt/sources.list
+      register: _sources_list_content
+
+    - name: Determine whether legacy sources.list is active
+      when: ansible_distribution == "Debian"
+      ansible.builtin.set_fact:
+        # Active only if it actually contains an uncommented `deb ` line. A fresh
+        # DEB822-native host (trixie) may keep an empty/placeholder sources.list,
+        # which must NOT trigger the legacy migration (it would drop components).
+        _legacy_sources_active: >-
+          {{ _sources_list.stat.exists
+             and ((_sources_list_content.content | default('') | b64decode)
+                  | regex_findall('(?m)^\s*deb\s') | length > 0) }}
+
+    - name: Migrate legacy Debian sources to DEB822
+      when:
+        - ansible_distribution == "Debian"
+        - _legacy_sources_active | default(false) | bool
+      block:
+        - name: Extract components from sources.list
+          ansible.builtin.set_fact:
+            _debian_components: >-
+              {{ (_sources_list_content.content | b64decode | regex_search('deb\s+\S+\s+' + ansible_distribution_release + '\s+(.+)', '\1') | first | default('main')).split() | unique | join(' ') }}
+
+        - name: Add Debian sources
+          ansible.builtin.template:
+            src: debian.sources.j2
+            dest: /etc/apt/sources.list.d/debian.sources
+            mode: "0644"
+          vars:
+            debian_components: "{{ _debian_components }}"
+
+        - name: Remove legacy sources.list
+          ansible.builtin.file:
+            path: /etc/apt/sources.list
+            state: absent
+
+    - name: Repoint native DEB822 Debian sources to the mirror
+      when:
+        - ansible_distribution == "Debian"
+        - not (_legacy_sources_active | default(false) | bool)
+      block:
+        - name: Check for DEB822 debian.sources
+          ansible.builtin.stat:
+            path: /etc/apt/sources.list.d/debian.sources
+          register: _debian_sources_deb822
+
+        - name: Swap Debian mirror host in debian.sources (preserve components/suites)
+          when: _debian_sources_deb822.stat.exists
+          ansible.builtin.replace:
+            path: /etc/apt/sources.list.d/debian.sources
+            # Replace only the URI host (deb.debian.org, security.debian.org,
+            # ftp.*.debian.org) with the mirror base; path suffixes (/debian,
+            # /debian-security) are kept. The lookahead anchors the host
+            # boundary so a longer host that merely contains ".debian.org" is
+            # not partially rewritten.
+            regexp: 'https?://(?:[a-z0-9-]+\.)*debian\.org(?=[:/\s]|$)'
+            replace: "{{ debian_mirror | regex_replace('/+$', '') }}"
+
+    - name: Check for Proxmox VE
+      ansible.builtin.stat:
+        path: /etc/pve
+      register: _pve_check
+
+    - name: Configure Proxmox no-subscription repo
+      when: _pve_check.stat.exists
+      vars:
+        _cfg: "{{ _proxmox.pve }}"
+      block:
+        - name: Remove enterprise repos
+          ansible.builtin.file:
+            path: "/etc/apt/sources.list.d/{{ item }}"
+            state: absent
+          loop: "{{ _cfg.enterprise_files }}"
+
+        - name: Add no-subscription repo
+          ansible.builtin.template:
+            src: proxmox.sources.j2
+            dest: "/etc/apt/sources.list.d/{{ _cfg.repo_file }}"
+            mode: "0644"
+
+- name: Update APT cache and optionally upgrade
+  ansible.builtin.apt:
+    # No cache_valid_time: this role may have just rewritten the sources, so the
+    # cache must always be refreshed against them before upgrade/install.
+    update_cache: true
+    upgrade: "{{ 'full' if apt_upgrade_enabled | bool else 'no' }}"
+  when: ansible_distribution in ["Ubuntu", "Debian"]
+
+- name: Install packages
+  ansible.builtin.package:
+    name: "{{ packages }}"
+    state: present
+  when: packages | length > 0

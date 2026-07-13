@@ -1,0 +1,11 @@
+---
+_proxmox:
+  pve:
+    enterprise_files:
+      - pve-enterprise.list
+      - pve-enterprise.sources
+      - ceph.list
+      - ceph.sources
+    repo_file: pve-no-subscription.sources
+    repo_path: pve
+    repo_component: pve-no-subscription
