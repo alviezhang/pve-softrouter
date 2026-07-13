@@ -1,0 +1,84 @@
+---
+# Fail fast, before any download or VM creation, if the host can't host the VMs.
+- name: Assert proxmox_vms specs are present and well-formed
+  ansible.builtin.assert:
+    that:
+      - proxmox_vms | length > 0
+      - proxmox_vms | rejectattr('vmid', 'defined') | list | length == 0
+      - proxmox_vms | rejectattr('name', 'defined') | list | length == 0
+      - proxmox_vms | rejectattr('memory', 'defined') | list | length == 0
+      - proxmox_vms | rejectattr('disk_bus', 'defined') | list | length == 0
+      - proxmox_vms | rejectattr('disk_size', 'defined') | list | length == 0
+      - proxmox_vms | rejectattr('image_url', 'defined') | list | length == 0
+      - proxmox_vms | selectattr('archive_format', 'in', ['zip', 'gz', 'raw']) | list | length == (proxmox_vms | length)
+      - vm_ram_check in ['sum', 'max', 'off']
+    fail_msg: >-
+      proxmox_vms is empty or has items missing required fields
+      (vmid/name/memory/disk_bus/disk_size/image_url, archive_format in
+      zip|gz|raw), or vm_ram_check is not one of sum|max|off.
+    quiet: true
+
+- name: Compute bridges required by the VM network specs
+  ansible.builtin.set_fact:
+    _req_bridges: >-
+      {{ proxmox_vms | map(attribute='networks', default=vm_networks_default)
+         | flatten | map('regex_search', 'bridge=([^,]+)', '\1')
+         | select() | flatten | unique | list }}
+
+- name: Assert required bridges exist
+  ansible.builtin.command:
+    argv: [ip, -o, link, show, "{{ item }}"]
+  loop: "{{ _req_bridges }}"
+  changed_when: false
+  check_mode: false
+
+- name: Ensure unzip is present when zip images are listed
+  ansible.builtin.package:
+    name: unzip
+    state: present
+  when: proxmox_vms | selectattr('archive_format', 'equalto', 'zip') | list | length > 0
+
+- name: Read image-capable storages
+  ansible.builtin.command:
+    argv: [pvesm, status, --content, images]
+  register: _pvesm
+  changed_when: false
+  check_mode: false
+
+- name: Assert target storage exists and supports VM images
+  ansible.builtin.assert:
+    that:
+      # Match a storage name at the start of a line (pvesm columns are space
+      # separated), not a loose substring, to avoid e.g. "local" matching "local-btrfs".
+      - "_pvesm.stdout is search('(?m)^' ~ (vm_storage | regex_escape) ~ ' ')"
+    fail_msg: "Storage '{{ vm_storage }}' not found among image-capable storages."
+    quiet: true
+
+- name: Check KVM device
+  ansible.builtin.stat:
+    path: /dev/kvm
+  register: _kvm
+
+- name: Assert KVM is available
+  ansible.builtin.assert:
+    that:
+      - _kvm.stat.exists
+    fail_msg: "/dev/kvm missing - enable VT-x/AMD-V virtualization in firmware."
+    quiet: true
+
+- name: Assert enough host RAM for the configured check mode
+  when: vm_ram_check != 'off'
+  vars:
+    _ram_needed_mb: >-
+      {{ (proxmox_vms | map(attribute='memory') | map('int') | sum)
+         if vm_ram_check == 'sum'
+         else (proxmox_vms | map(attribute='memory') | map('int') | max) }}
+  ansible.builtin.assert:
+    that:
+      - ansible_memtotal_mb >= (_ram_needed_mb | int + vm_host_reserve_mb | int)
+    fail_msg: >-
+      Host RAM {{ ansible_memtotal_mb }} MB is below {{ _ram_needed_mb }} MB
+      ({{ vm_ram_check }} of VM memory) + {{ vm_host_reserve_mb }} MB reserve.
+      Shrink VM memory, or set vm_ram_check: max (only one VM runs at a time)
+      or off.
+    quiet: true

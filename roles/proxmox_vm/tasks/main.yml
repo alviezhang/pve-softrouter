@@ -1,0 +1,10 @@
+---
+- name: Preflight checks
+  ansible.builtin.import_tasks: preflight.yml
+
+- name: Provision VMs
+  ansible.builtin.include_tasks: provision_vm.yml
+  loop: "{{ proxmox_vms }}"
+  loop_control:
+    loop_var: vm
+    label: "{{ vm.name }} ({{ vm.vmid }})"

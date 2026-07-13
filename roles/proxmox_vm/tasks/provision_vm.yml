@@ -1,0 +1,159 @@
+---
+# Per-VM provisioning. Looped from main.yml with loop_var: vm.
+
+- name: Reset per-VM run state
+  ansible.builtin.set_fact:
+    _vm_create_attempted: false
+    _wd: {}
+
+- name: Read current VM config
+  ansible.builtin.command:
+    argv: [qm, config, "{{ vm.vmid }}", --current]
+  register: _vm_cfg
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Assert vmid is free or already this exact VM
+  ansible.builtin.assert:
+    that:
+      # Exact line match (qm config prints "name: <name>"), not substring, so
+      # e.g. "chr-7.21.4-old" does not pass as "chr-7.21.4".
+      - "_vm_cfg.rc != 0 or (('name: ' ~ vm.name) in _vm_cfg.stdout_lines)"
+    fail_msg: "VMID {{ vm.vmid }} already exists but is not {{ vm.name }}."
+    quiet: true
+
+- name: Report VM that would be created (check mode)
+  when:
+    - _vm_cfg.rc != 0
+    - ansible_check_mode
+  ansible.builtin.debug:
+    msg: "Would create VM {{ vm.vmid }} ({{ vm.name }}) from {{ vm.image_url }} on {{ vm_storage }}, disk {{ vm.disk_bus }} {{ vm.disk_size }}"
+
+# check mode cannot simulate the disk download/import (tempfile/command are
+# skipped), so only run the real create flow outside check mode.
+- name: Create and import VM when absent
+  when:
+    - _vm_cfg.rc != 0
+    - not ansible_check_mode
+  vars:
+    _vm_networks: "{{ vm.networks | default(vm_networks_default) }}"
+    # ['--net0', '<spec0>', '--net1', '<spec1>', ...]
+    _vm_net_args: >-
+      {{ range(_vm_networks | length) | map('string')
+         | map('regex_replace', '^', '--net') | list
+         | zip(_vm_networks) | flatten }}
+  block:
+    - name: Create temp work dir
+      ansible.builtin.tempfile:
+        state: directory
+        suffix: "-{{ vm.name }}"
+      register: _wd
+
+    - name: Download image
+      ansible.builtin.get_url:
+        url: "{{ vm.image_url }}"
+        dest: "{{ _wd.path }}/{{ vm.image_url | basename }}"
+        checksum: "{{ ('sha256:' ~ vm.checksum_url) if (vm.checksum_url | default('') | length > 0) else omit }}"
+        mode: "0644"
+      register: _dl
+
+    - name: Extract zip image
+      when: vm.archive_format == 'zip'
+      ansible.builtin.command:
+        argv: [unzip, -o, "{{ _dl.dest }}", -d, "{{ _wd.path }}"]
+      changed_when: true
+
+    - name: Extract gz image
+      when: vm.archive_format == 'gz'
+      ansible.builtin.command:
+        argv: [gunzip, -kf, "{{ _dl.dest }}"]
+      changed_when: true
+
+    # raw needs no extraction: the downloaded file is the .img itself and is
+    # picked up by the find below (raw images must end in .img).
+    - name: Locate extracted .img
+      ansible.builtin.find:
+        paths: "{{ _wd.path }}"
+        patterns: "*.img"
+      register: _img
+
+    - name: Assert exactly one .img was extracted
+      ansible.builtin.assert:
+        that:
+          - _img.files | length == 1
+        fail_msg: >-
+          Expected one .img in {{ _wd.path }}, found {{ _img.files | length }}.
+          For archive_format: raw the image URL must end in .img.
+        quiet: true
+
+    # Set right before qm create: if create writes a config then fails, the
+    # rescue still rolls the half-created VM back (its vmid was free on entry).
+    - name: Mark VM create attempted
+      ansible.builtin.set_fact:
+        _vm_create_attempted: true
+
+    - name: Create VM
+      ansible.builtin.command:
+        argv: >-
+          {{ ['qm', 'create', vm.vmid | string,
+              '--name', vm.name,
+              '--memory', vm.memory | string,
+              '--cores', (vm.cores | default(ansible_processor_vcpus)) | string,
+              '--cpu', 'host',
+              '--ostype', 'l26',
+              '--balloon', '0',
+              '--bios', 'seabios',
+              '--vga', 'std',
+              '--serial0', 'socket']
+             + _vm_net_args }}
+      changed_when: true
+
+    - name: Import and attach boot disk
+      ansible.builtin.command:
+        argv:
+          - qm
+          - set
+          - "{{ vm.vmid }}"
+          - "--{{ vm.disk_bus }}"
+          - "{{ vm_storage }}:0,import-from={{ _img.files[0].path }},discard=on"
+      changed_when: true
+
+    - name: Set boot order and autostart
+      ansible.builtin.command:
+        argv: [qm, set, "{{ vm.vmid }}", --boot, "order={{ vm.disk_bus }}", --onboot, "{{ vm.onboot | default(0) }}"]
+      changed_when: true
+
+    - name: Resize boot disk
+      ansible.builtin.command:
+        argv: [qm, resize, "{{ vm.vmid }}", "{{ vm.disk_bus }}", "{{ vm.disk_size }}"]
+      changed_when: true
+
+  rescue:
+    - name: Roll back the VM this run created
+      # The vmid was free when this block started, so anything at it now was
+      # created by this run (including a half-created VM). Ignore "not found".
+      when: _vm_create_attempted | default(false) | bool
+      ansible.builtin.command:
+        argv: [qm, destroy, "{{ vm.vmid }}", --purge, "1", --destroy-unreferenced-disks, "1"]
+      failed_when: false
+      changed_when: true
+
+    - name: Fail after rollback
+      ansible.builtin.fail:
+        msg: "Provisioning {{ vm.name }} ({{ vm.vmid }}) failed; rolled back this run's VM (if any)."
+
+  always:
+    - name: Clean up temp work dir
+      when: _wd.path is defined
+      ansible.builtin.file:
+        path: "{{ _wd.path }}"
+        state: absent
+
+- name: Enforce onboot setting on existing VM
+  when:
+    - _vm_cfg.rc == 0
+    - "('onboot: ' ~ (vm.onboot | default(0) | string)) not in _vm_cfg.stdout_lines"
+  ansible.builtin.command:
+    argv: [qm, set, "{{ vm.vmid }}", --onboot, "{{ vm.onboot | default(0) }}"]
+  changed_when: true

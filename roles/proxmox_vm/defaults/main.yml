@@ -1,0 +1,39 @@
+---
+# proxmox_vm — provision (create-only) VMs on a PVE node from disk images.
+#
+# Runs ON the PVE node (uses qm) with become: true. Idempotent: an existing
+# VM (same vmid + name) is left alone except that its onboot flag is
+# enforced. A VM created by this run that then fails mid-provision is rolled
+# back (destroyed) so reruns retry cleanly.
+#
+# Required:
+#   proxmox_vms: list of VM specs. Each item:
+#     vmid:           unique VM id (e.g. 900)
+#     name:           VM name (also the idempotency key vs an existing vmid)
+#     memory:         RAM in MB
+#     disk_bus:       boot disk bus: virtio0 | sata0 | scsi0
+#     disk_size:      target size for `qm resize` (e.g. "8G")
+#     image_url:      URL of the image (.img.zip / .img.gz / raw .img)
+#     archive_format: "zip" | "gz" | "raw" (raw = uncompressed .img)
+#     checksum_url:   sha256sums URL for get_url verification, or "" to skip
+#   Optional per VM:
+#     onboot:         1 to autostart with the node (default 0)
+#     cores:          vCPU count (default: all host vCPUs)
+#     networks:       qm --netN values, in order (default: vm_networks_default)
+#
+# Optional:
+#   vm_storage: PVE storage for the imported disks (default: local-lvm)
+#   vm_networks_default: default NICs for every VM. Single bridge suits the
+#     common one-armed-router setup; a LAN+WAN router wants two, e.g.
+#     ["virtio,bridge=vmbr0", "virtio,bridge=vmbr1"]
+#   vm_ram_check: preflight RAM mode. sum = all VMs may run at once (safe
+#     default) | max = only one VM runs at a time (clone-style setups) | off
+#   vm_host_reserve_mb: RAM kept free for the PVE host in the check (default 1024)
+#
+# VMs are created stopped with ballooning off; proxy for image downloads
+# comes from the play-level environment (http_proxy/https_proxy).
+vm_storage: local-lvm
+vm_host_reserve_mb: 1024
+vm_ram_check: sum
+vm_networks_default: ["virtio,bridge=vmbr0"]
+proxmox_vms: []
