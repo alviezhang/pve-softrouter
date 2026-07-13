@@ -7,6 +7,7 @@ skip_list:
   - name[casing]
   - var-naming[no-role-prefix] # vm_*/apt_* names are shared with existing consumers
   - jinja[spacing]
+  - meta-runtime[unsupported-version] # PVE 8 bookworm ships ansible-core 2.14; we intentionally support it
 
 warn_list:
   - command-instead-of-shell
