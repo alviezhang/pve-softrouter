@@ -1,0 +1,4 @@
+vars.yml
+inventory.yml
+*.tar.gz
+.DS_Store

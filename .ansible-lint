@@ -1,0 +1,18 @@
+# https://ansible.readthedocs.io/projects/lint/configuring/
+profile: production
+
+skip_list:
+  - yaml[line-length]
+  - yaml[truthy]
+  - name[casing]
+  - var-naming[no-role-prefix] # vm_*/apt_* names are shared with existing consumers
+  - jinja[spacing]
+
+warn_list:
+  - command-instead-of-shell
+  - command-instead-of-module
+  - risky-shell-pipe
+  - risky-file-permissions
+  - name[missing]
+
+offline: false
