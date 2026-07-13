@@ -1,0 +1,14 @@
+---
+# collection 模式入口:
+#   ansible-galaxy collection install git+https://github.com/alviezhang/pve-softrouter.git
+#   ansible-playbook -i 'localhost,' -c local alviezhang.pve_softrouter.provision -e @vars.yml
+# 变量与 clone 模式的 vars.example.yml 相同(proxmox_vms/vm_storage/proxy_url/...)。
+- name: Provision soft-router VMs on Proxmox VE
+  hosts: all
+  become: true
+  environment:
+    http_proxy: "{{ proxy_url | default('') }}"
+    https_proxy: "{{ proxy_url | default('') }}"
+  roles:
+    - alviezhang.pve_softrouter.apt_mirror
+    - alviezhang.pve_softrouter.proxmox_vm
