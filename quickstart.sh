@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # pve-softrouter 一键脚本 —— 在 PVE 节点的 shell 里执行:
-#   bash <(curl -fsSL https://ghfast.top/https://raw.githubusercontent.com/alviezhang/pve-softrouter/main/quickstart.sh)
+#   bash <(curl -fsSL https://ghfast.top/https://raw.githubusercontent.com/alviezhang/pve-softrouter/main/quickstart.sh)          # 生成 vars.yml,编辑后重跑
+#   bash <(curl -fsSL https://ghfast.top/https://raw.githubusercontent.com/alviezhang/pve-softrouter/main/quickstart.sh) openwrt  # 一步到位(openwrt | chr | immortalwrt)
 # 环境变量:
 #   GH_MIRROR  GitHub 加速前缀(须以 / 结尾),默认 https://ghfast.top/;海外机器可置空:GH_MIRROR= bash <(...)
 #   DIR        仓库检出位置,默认 /root/pve-softrouter
@@ -9,6 +10,15 @@ set -euo pipefail
 GH_MIRROR="${GH_MIRROR-https://ghfast.top/}"
 DIR="${DIR:-/root/pve-softrouter}"
 REPO_URL="${GH_MIRROR}https://github.com/alviezhang/pve-softrouter.git"
+PRESET="${1:-}"
+
+case "$PRESET" in
+  ""|openwrt|chr|immortalwrt) ;;
+  *)
+    echo "未知系统: $PRESET(可选: openwrt | chr | immortalwrt)" >&2
+    exit 1
+    ;;
+esac
 
 if [ "$(id -u)" -ne 0 ]; then
   echo "请以 root 运行(PVE 节点 shell 默认就是 root)" >&2
@@ -31,11 +41,19 @@ else
 fi
 
 cd "$DIR"
-if [ ! -f vars.yml ]; then
+if [ -n "$PRESET" ]; then
+  if [ -f vars.yml ]; then
+    echo "==> 已存在 $DIR/vars.yml,直接复用(想改用 $PRESET 预设请先: rm $DIR/vars.yml)"
+  else
+    cp "examples/$PRESET.yml" vars.yml
+    echo "==> 使用预设 $PRESET(高级选项见 vars.example.yml / README)"
+  fi
+elif [ ! -f vars.yml ]; then
   cp vars.example.yml vars.yml
   echo
   echo "已生成 $DIR/vars.yml —— 请编辑它(例如: nano $DIR/vars.yml),"
   echo "改好后重新运行同一条命令,即开始创建 VM。"
+  echo "(也可以直接带系统名一步到位,例如: bash <(curl ...) openwrt)"
   exit 0
 fi
 

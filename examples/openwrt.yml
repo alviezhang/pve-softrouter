@@ -1,0 +1,13 @@
+---
+# openwrt 预设 —— quickstart.sh 参数 `openwrt` 使用;完整可调项见 vars.example.yml。
+vm_storage: local-lvm
+proxmox_vms:
+  - vmid: 901
+    name: openwrt-25.12.4
+    memory: 2048
+    disk_bus: sata0
+    disk_size: "8G"
+    image_url: https://downloads.openwrt.org/releases/25.12.4/targets/x86/64/openwrt-25.12.4-x86-64-generic-squashfs-combined.img.gz
+    archive_format: gz
+    checksum_url: https://downloads.openwrt.org/releases/25.12.4/targets/x86/64/sha256sums
+    onboot: 1

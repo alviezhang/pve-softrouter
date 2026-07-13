@@ -34,3 +34,4 @@ build_ignore:
   - .ansible
   - .superpowers
   - .DS_Store
+  - examples

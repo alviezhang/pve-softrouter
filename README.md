@@ -13,6 +13,14 @@ SSH 进你的 PVE 节点(或网页控制台开 Shell),执行:
 bash <(curl -fsSL https://ghfast.top/https://raw.githubusercontent.com/alviezhang/pve-softrouter/main/quickstart.sh)
 ```
 
+知道自己要装哪个系统的话,带上系统名一条命令直达(用内置预设,不用编辑配置):
+
+```bash
+bash <(curl -fsSL https://ghfast.top/https://raw.githubusercontent.com/alviezhang/pve-softrouter/main/quickstart.sh) openwrt
+```
+
+系统名可选 `openwrt` / `chr` / `immortalwrt`;要自定义(双网卡、多台、换版本)就用不带参数的方式。
+
 第一次运行会生成 `/root/pve-softrouter/vars.yml` 并提示你编辑(选择要装的系统、
 存储、网卡);编辑完**重新运行同一条命令**即开始创建 VM。完成后在 PVE 网页里
 启动 VM、打开控制台做系统初始化即可。

@@ -1,0 +1,14 @@
+---
+# RouterOS CHR 预设 —— quickstart.sh 参数 `chr` 使用;完整可调项见 vars.example.yml。
+# 注意:CHR 免费授权上传限速 1 Mbps,解锁需在 MikroTik 官网购买 license。
+vm_storage: local-lvm
+proxmox_vms:
+  - vmid: 900
+    name: chr-7.21.4
+    memory: 1024
+    disk_bus: virtio0
+    disk_size: "4G"
+    image_url: https://download.mikrotik.com/routeros/7.21.4/chr-7.21.4.img.zip
+    archive_format: zip
+    checksum_url: ""
+    onboot: 1
