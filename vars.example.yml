@@ -1,0 +1,50 @@
+---
+# pve-softrouter 配置。cp vars.example.yml vars.yml 后按需修改。
+# 已存在的 vmid(且同名)会自动跳过,可反复执行。
+
+# VM 磁盘所在的 PVE 存储(`pvesm status` 可查;PVE 默认安装就是 local-lvm)
+vm_storage: local-lvm
+
+# 镜像下载走的 HTTP 代理(可选)。PVE 节点能直接访问下载源就保持注释。
+# proxy_url: "http://192.168.1.100:7890"
+
+# apt 换源(默认开,换到 TUNA 并启用 PVE 无订阅源;海外机器设为 false)
+# apt_mirror_enabled: false
+
+# 每台 VM 的默认网卡(qm --netN 的值,按顺序)。默认单桥 = 旁路由/单臂;
+# 双网口主路由示例:
+# vm_networks_default: ["virtio,bridge=vmbr0", "virtio,bridge=vmbr1"]
+
+# 内存预检:sum = 假定所有 VM 同时跑(默认)| max = 只跑其中一台 | off = 跳过
+# vm_ram_check: sum
+
+proxmox_vms:
+  - vmid: 901
+    name: openwrt-25.12.4
+    memory: 2048
+    disk_bus: sata0
+    disk_size: "8G"
+    image_url: https://downloads.openwrt.org/releases/25.12.4/targets/x86/64/openwrt-25.12.4-x86-64-generic-squashfs-combined.img.gz
+    archive_format: gz
+    checksum_url: https://downloads.openwrt.org/releases/25.12.4/targets/x86/64/sha256sums
+    onboot: 1
+
+  # RouterOS CHR(免费授权限速 1Mbps 上传,需自行购买 license 解锁)
+  # - vmid: 900
+  #   name: chr-7.21.4
+  #   memory: 1024
+  #   disk_bus: virtio0
+  #   disk_size: "4G"
+  #   image_url: https://download.mikrotik.com/routeros/7.21.4/chr-7.21.4.img.zip
+  #   archive_format: zip
+  #   checksum_url: ""
+
+  # ImmortalWrt(国内常用的 OpenWrt 分支)
+  # - vmid: 902
+  #   name: immortalwrt-25.12.0
+  #   memory: 2048
+  #   disk_bus: sata0
+  #   disk_size: "8G"
+  #   image_url: https://downloads.immortalwrt.org/releases/25.12.0/targets/x86/64/immortalwrt-25.12.0-x86-64-generic-squashfs-combined.img.gz
+  #   archive_format: gz
+  #   checksum_url: https://downloads.immortalwrt.org/releases/25.12.0/targets/x86/64/sha256sums

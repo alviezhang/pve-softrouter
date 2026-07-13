@@ -1,0 +1,8 @@
+---
+# 远程模式:把 ansible_host 改成你的 PVE 节点 IP(SSH root 登录)。
+# 在 PVE 本机跑不需要本文件(quickstart.sh / make local 自动用 localhost)。
+all:
+  hosts:
+    pve:
+      ansible_host: 192.168.1.2
+      ansible_user: root

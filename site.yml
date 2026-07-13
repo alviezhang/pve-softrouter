@@ -1,0 +1,16 @@
+---
+# pve-softrouter — 在 PVE 节点上创建软路由 VM(clone 模式入口)。
+# 配置:cp vars.example.yml vars.yml 并编辑。
+# 本机跑:ansible-playbook -i 'localhost,' -c local site.yml   (= make local)
+# 远程跑:ansible-playbook -i inventory.yml site.yml           (= make provision)
+- name: Provision soft-router VMs on Proxmox VE
+  hosts: all
+  become: true
+  vars_files:
+    - vars.yml
+  environment:
+    http_proxy: "{{ proxy_url | default('') }}"
+    https_proxy: "{{ proxy_url | default('') }}"
+  roles:
+    - apt_mirror
+    - proxmox_vm
