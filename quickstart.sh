@@ -43,7 +43,7 @@ esac
 
 # 其余参数:key=value → ansible --extra-vars;bridges= 转成网卡列表
 EXTRA_ARGS=()
-for kv in "${@}"; do
+for kv in ${@+"$@"}; do
   case "$kv" in
     bridges=*)
       IFS=',' read -ra _brs <<<"${kv#bridges=}"
@@ -59,6 +59,13 @@ for kv in "${@}"; do
     *) echo "无法识别的参数: $kv(应为 key=value)" >&2; echo >&2; usage >&2; exit 1 ;;
   esac
 done
+
+if [ -z "$PRESET" ] && [ ! -f "$DIR/vars.yml" ]; then
+  echo "请指定要安装的系统。" >&2
+  echo >&2
+  usage >&2
+  exit 1
+fi
 
 if [ "$(id -u)" -ne 0 ]; then
   echo "请以 root 运行(PVE 节点 shell 默认就是 root)" >&2
