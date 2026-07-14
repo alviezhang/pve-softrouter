@@ -27,23 +27,30 @@
              and ((_sources_list_content.content | default('') | b64decode)
                   | regex_findall('(?m)^\s*deb\s') | length > 0) }}
 
-    - name: Check whether every active legacy entry is an official Debian source
+    - name: Check legacy entries for non-official or unsupported forms
       when: ansible_distribution == "Debian"
       ansible.builtin.set_fact:
         # Uncommented deb/deb-src lines whose URI is NOT *.debian.org. If any
         # exist we leave sources.list alone: migrating would silently drop
-        # third-party repos, options ([arch=..]) or custom mirrors.
+        # third-party repos or custom mirrors.
         _legacy_foreign_lines: >-
           {{ (_sources_list_content.content | default('') | b64decode)
              | regex_findall('(?m)^\s*deb(?:-src)?\s+(?:\[[^\]]*\]\s+)?(\S+)')
              | reject('search', '^https?://(?:[a-z0-9-]+\.)*debian\.org(?:[:/]|$)')
              | list }}
+        # Active lines with bracket options ([arch=..] etc.) or deb-src: our
+        # two plain stanzas cannot represent them, so their presence also
+        # skips the migration. Fresh PVE installs never have them.
+        _legacy_unsupported_lines: >-
+          {{ (_sources_list_content.content | default('') | b64decode)
+             | regex_findall('(?m)^\s*(deb-src\s.*|deb\s+\[[^\]]*\].*)') | list }}
 
     - name: Migrate legacy Debian sources to DEB822
       when:
         - ansible_distribution == "Debian"
         - _legacy_sources_active | default(false) | bool
         - _legacy_foreign_lines | default([]) | length == 0
+        - _legacy_unsupported_lines | default([]) | length == 0
       block:
         - name: Extract components from sources.list
           ansible.builtin.set_fact:
@@ -60,21 +67,24 @@
           vars:
             debian_components: "{{ _debian_components }}"
 
-        - name: Back up legacy sources.list (apt ignores .bak)
+        - name: Back up legacy sources.list (timestamped so reruns never clobber it; apt ignores .bak)
           ansible.builtin.command:
-            argv: [mv, /etc/apt/sources.list, /etc/apt/sources.list.bak]
+            argv: [mv, /etc/apt/sources.list, "/etc/apt/sources.list.{{ ansible_date_time.epoch }}.bak"]
           changed_when: true
 
-    - name: Report skipped legacy migration (non-official sources present)
+    - name: Report skipped legacy migration (non-official or unsupported entries)
       when:
         - ansible_distribution == "Debian"
         - _legacy_sources_active | default(false) | bool
-        - _legacy_foreign_lines | default([]) | length > 0
+        - >-
+          (_legacy_foreign_lines | default([]) | length > 0) or
+          (_legacy_unsupported_lines | default([]) | length > 0)
       ansible.builtin.debug:
         msg: >-
-          sources.list contains non-Debian-official entries
-          ({{ _legacy_foreign_lines | join(', ') }}); leaving it untouched —
-          switch mirrors manually if desired.
+          sources.list 含第三方源或带选项([arch=…])/deb-src 条目,不自动迁移
+          (第三方: {{ _legacy_foreign_lines | join(', ') }};
+          选项/deb-src: {{ _legacy_unsupported_lines | join(' | ') }})——
+          请自行换源。
 
     - name: Repoint native DEB822 Debian sources to the mirror
       when:
@@ -124,11 +134,22 @@
           register: _ent_content
 
         - name: Remove repos that point at enterprise.proxmox.com
-          # Only files actually referencing the enterprise host are removed; a
-          # user-configured ceph no-subscription/custom-mirror file is kept.
+          # Delete only when the file has at least one ACTIVE URL line and
+          # every active URL line is the enterprise host. Files where the
+          # enterprise reference is only a comment, or that mix in an active
+          # custom mirror, are left alone. Trimmed-line matching covers both
+          # .list and DEB822 .sources (both carry the URL on an active line).
           when:
             - not (item is skipped)
-            - "'enterprise.proxmox.com' in (item.content | b64decode)"
+            - >-
+              (item.content | b64decode).splitlines()
+              | map('trim') | reject('match', '^(#|$)')
+              | select('search', 'https?://') | list | length > 0
+            - >-
+              (item.content | b64decode).splitlines()
+              | map('trim') | reject('match', '^(#|$)')
+              | select('search', 'https?://')
+              | reject('search', 'enterprise\.proxmox\.com') | list | length == 0
           ansible.builtin.file:
             path: "{{ item.source }}"
             state: absent

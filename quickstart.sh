@@ -123,4 +123,5 @@ main() {
   exec ansible-playbook -i 'localhost,' -c local site.yml ${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"}
 }
 
-main "$@"
+# 花括号组必须完整闭合才会执行——下载被截断时整个文件只报语法错误,一行都不跑
+{ main "$@"; }

@@ -19,17 +19,23 @@
     that:
       # Exact line match (qm config prints "name: <name>"), not substring, so
       # e.g. "chr-7.21.4-old" does not pass as "chr-7.21.4". The boot-disk key
-      # must exist too: a same-name VM without it is a half-provisioned wreck
-      # from an interrupted run and must not be silently treated as done.
+      # AND our boot-order line must exist too: a same-name VM missing either
+      # is a half-provisioned wreck from a run interrupted between create and
+      # the boot-order step, and must not be silently treated as done.
+      # Pre-v1.1 runs of this role set the same `--boot order=<disk_bus>`, so
+      # existing healthy VMs still pass. The run-tag/description is
+      # deliberately NOT checked here: legacy VMs have none, and requiring it
+      # would break every pre-v1.1 install.
       - >-
         _vm_cfg.rc != 0 or
         ((('name: ' ~ vm.name) in _vm_cfg.stdout_lines) and
-         (_vm_cfg.stdout is search('(?m)^' ~ (vm.disk_bus | regex_escape) ~ ':')))
+         (_vm_cfg.stdout is search('(?m)^' ~ (vm.disk_bus | regex_escape) ~ ':')) and
+         (_vm_cfg.stdout is search('(?m)^boot: order=' ~ (vm.disk_bus | regex_escape))))
     fail_msg: >-
       VMID {{ vm.vmid }} already exists but is not a complete {{ vm.name }}
-      (different name, or missing its {{ vm.disk_bus }} boot disk from an
-      interrupted run). Inspect it and remove it manually (qm destroy
-      {{ vm.vmid }} --purge 1) before re-running.
+      (different name, or missing its {{ vm.disk_bus }} boot disk or boot
+      order from an interrupted run). Inspect it and remove it manually
+      (qm destroy {{ vm.vmid }} --purge 1) before re-running.
     quiet: true
 
 - name: Report VM that would be created (check mode)
