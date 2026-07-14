@@ -135,10 +135,13 @@
 
         - name: Remove repos that point at enterprise.proxmox.com
           # Delete only when the file has at least one ACTIVE URL line and
-          # every active URL line is the enterprise host. Files where the
-          # enterprise reference is only a comment, or that mix in an active
-          # custom mirror, are left alone. Trimmed-line matching covers both
-          # .list and DEB822 .sources (both carry the URL on an active line).
+          # every active URL line's HOST is exactly enterprise.proxmox.com
+          # (host-anchored: a URL that merely contains the string in its
+          # path, or a lookalike host suffix, does not count). Files where
+          # the enterprise reference is only a comment, or that mix in an
+          # active custom mirror, are left alone. Trimmed-line matching
+          # covers both .list and DEB822 .sources (both carry the URL on an
+          # active line).
           when:
             - not (item is skipped)
             - >-
@@ -149,7 +152,7 @@
               (item.content | b64decode).splitlines()
               | map('trim') | reject('match', '^(#|$)')
               | select('search', 'https?://')
-              | reject('search', 'enterprise\.proxmox\.com') | list | length == 0
+              | reject('search', 'https?://enterprise\.proxmox\.com([:/\s]|$)') | list | length == 0
           ansible.builtin.file:
             path: "{{ item.source }}"
             state: absent
