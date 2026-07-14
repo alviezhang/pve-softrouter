@@ -37,6 +37,7 @@ case "$PRESET" in
   openwrt|chr|immortalwrt) shift ;;
   "") : ;;                       # 无系统名:仅当已有 vars.yml 时继续(见下)
   -h|--help) usage; exit 0 ;;
+  *=*) echo "请先指定系统名(openwrt | chr | immortalwrt),再跟选项。" >&2; echo >&2; usage >&2; exit 1 ;;
   *) echo "未知系统: $PRESET" >&2; echo >&2; usage >&2; exit 1 ;;
 esac
 

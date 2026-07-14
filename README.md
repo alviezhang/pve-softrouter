@@ -7,7 +7,7 @@
 
 ## 快速开始(在 PVE 节点上)
 
-一条命令,系统名必选(`openwrt` / `chr` / `immortalwrt`):
+SSH 进你的 PVE 节点(或网页控制台开 Shell),执行——系统名必选(`openwrt` / `chr` / `immortalwrt`):
 
 ```bash
 bash <(curl -fsSL https://ghfast.top/https://raw.githubusercontent.com/alviezhang/pve-softrouter/main/quickstart.sh) openwrt

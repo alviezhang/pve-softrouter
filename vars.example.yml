@@ -1,4 +1,5 @@
 ---
+# pve-softrouter 配置示例。clone 模式:cp vars.example.yml vars.yml 后按需修改。
 
 # VM 磁盘所在的 PVE 存储(`pvesm status` 可查;PVE 默认安装就是 local-lvm)
 vm_storage: local-lvm
