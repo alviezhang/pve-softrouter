@@ -19,18 +19,20 @@
     that:
       # Exact line match (qm config prints "name: <name>"), not substring, so
       # e.g. "chr-7.21.4-old" does not pass as "chr-7.21.4". The boot-disk key
-      # AND our boot-order line must exist too: a same-name VM missing either
-      # is a half-provisioned wreck from a run interrupted between create and
-      # the boot-order step, and must not be silently treated as done.
-      # Pre-v1.1 runs of this role set the same `--boot order=<disk_bus>`, so
-      # existing healthy VMs still pass. The run-tag/description is
-      # deliberately NOT checked here: legacy VMs have none, and requiring it
-      # would break every pre-v1.1 install.
+      # must exist AND the disk must appear somewhere in the boot order list
+      # (anywhere, not just first: a user-customized order like
+      # "net0;virtio0" is still a complete VM). A run interrupted between
+      # import and the boot-order step leaves an order WITHOUT the disk (it
+      # was not attached at qm create time), so a half-provisioned wreck
+      # still fails instead of being silently treated as done. Pre-v1.1 runs
+      # set the same `--boot order=<disk_bus>`, so existing healthy VMs pass.
+      # The run-tag/description is deliberately NOT checked here: legacy VMs
+      # have none, and requiring it would break every pre-v1.1 install.
       - >-
         _vm_cfg.rc != 0 or
         ((('name: ' ~ vm.name) in _vm_cfg.stdout_lines) and
          (_vm_cfg.stdout is search('(?m)^' ~ (vm.disk_bus | regex_escape) ~ ':')) and
-         (_vm_cfg.stdout is search('(?m)^boot: order=' ~ (vm.disk_bus | regex_escape))))
+         (_vm_cfg.stdout is search('(?m)^boot: order=[^\n]*' ~ (vm.disk_bus | regex_escape))))
     fail_msg: >-
       VMID {{ vm.vmid }} already exists but is not a complete {{ vm.name }}
       (different name, or missing its {{ vm.disk_bus }} boot disk or boot
