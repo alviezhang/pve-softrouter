@@ -10,12 +10,15 @@
       - proxmox_vms | rejectattr('disk_bus', 'defined') | list | length == 0
       - proxmox_vms | rejectattr('disk_size', 'defined') | list | length == 0
       - proxmox_vms | rejectattr('image_url', 'defined') | list | length == 0
+      - proxmox_vms | rejectattr('checksum_url', 'defined') | list | length == 0
       - proxmox_vms | selectattr('archive_format', 'in', ['zip', 'gz', 'raw']) | list | length == (proxmox_vms | length)
       - vm_ram_check in ['sum', 'max', 'off']
     fail_msg: >-
       proxmox_vms is empty or has items missing required fields
-      (vmid/name/memory/disk_bus/disk_size/image_url, archive_format in
-      zip|gz|raw), or vm_ram_check is not one of sum|max|off.
+      (vmid/name/memory/disk_bus/disk_size/image_url/checksum_url,
+      archive_format in zip|gz|raw), or vm_ram_check is not one of
+      sum|max|off. checksum_url is required ("" skips verification
+      explicitly).
     quiet: true
 
 - name: Compute bridges required by the VM network specs
@@ -82,3 +85,7 @@
       Shrink VM memory, or set vm_ram_check: max (only one VM runs at a time)
       or off.
     quiet: true
+
+- name: Generate a run tag for rollback ownership checks
+  ansible.builtin.set_fact:
+    _pvsr_run_tag: "pve-softrouter-run-{{ 1000000000 | random }}"

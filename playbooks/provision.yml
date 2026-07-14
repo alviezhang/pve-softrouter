@@ -9,6 +9,18 @@
   environment:
     http_proxy: "{{ proxy_url | default('') }}"
     https_proxy: "{{ proxy_url | default('') }}"
+  pre_tasks:
+    - name: Check for Proxmox VE
+      ansible.builtin.stat:
+        path: /etc/pve
+      register: _pve_root
+
+    - name: Refuse to run on a non-PVE host
+      ansible.builtin.assert:
+        that:
+          - _pve_root.stat.exists
+        fail_msg: "此主机不是 Proxmox VE 节点(缺少 /etc/pve),中止——本工具只应在 PVE 上运行。"
+        quiet: true
   roles:
     - alviezhang.pve_softrouter.apt_mirror
     - alviezhang.pve_softrouter.proxmox_vm

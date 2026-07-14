@@ -27,10 +27,23 @@
              and ((_sources_list_content.content | default('') | b64decode)
                   | regex_findall('(?m)^\s*deb\s') | length > 0) }}
 
+    - name: Check whether every active legacy entry is an official Debian source
+      when: ansible_distribution == "Debian"
+      ansible.builtin.set_fact:
+        # Uncommented deb/deb-src lines whose URI is NOT *.debian.org. If any
+        # exist we leave sources.list alone: migrating would silently drop
+        # third-party repos, options ([arch=..]) or custom mirrors.
+        _legacy_foreign_lines: >-
+          {{ (_sources_list_content.content | default('') | b64decode)
+             | regex_findall('(?m)^\s*deb(?:-src)?\s+(?:\[[^\]]*\]\s+)?(\S+)')
+             | reject('search', '^https?://(?:[a-z0-9-]+\.)*debian\.org(?:[:/]|$)')
+             | list }}
+
     - name: Migrate legacy Debian sources to DEB822
       when:
         - ansible_distribution == "Debian"
         - _legacy_sources_active | default(false) | bool
+        - _legacy_foreign_lines | default([]) | length == 0
       block:
         - name: Extract components from sources.list
           ansible.builtin.set_fact:
@@ -47,10 +60,21 @@
           vars:
             debian_components: "{{ _debian_components }}"
 
-        - name: Remove legacy sources.list
-          ansible.builtin.file:
-            path: /etc/apt/sources.list
-            state: absent
+        - name: Back up legacy sources.list (apt ignores .bak)
+          ansible.builtin.command:
+            argv: [mv, /etc/apt/sources.list, /etc/apt/sources.list.bak]
+          changed_when: true
+
+    - name: Report skipped legacy migration (non-official sources present)
+      when:
+        - ansible_distribution == "Debian"
+        - _legacy_sources_active | default(false) | bool
+        - _legacy_foreign_lines | default([]) | length > 0
+      ansible.builtin.debug:
+        msg: >-
+          sources.list contains non-Debian-official entries
+          ({{ _legacy_foreign_lines | join(', ') }}); leaving it untouched —
+          switch mirrors manually if desired.
 
     - name: Repoint native DEB822 Debian sources to the mirror
       when:
@@ -84,11 +108,33 @@
       vars:
         _cfg: "{{ _proxmox.pve }}"
       block:
-        - name: Remove enterprise repos
-          ansible.builtin.file:
+        - name: Inspect candidate enterprise repo files
+          ansible.builtin.stat:
             path: "/etc/apt/sources.list.d/{{ item }}"
-            state: absent
           loop: "{{ _cfg.enterprise_files }}"
+          register: _ent_stat
+
+        - name: Read candidate enterprise repo files
+          when: item.stat.exists
+          ansible.builtin.slurp:
+            src: "{{ item.stat.path }}"
+          loop: "{{ _ent_stat.results }}"
+          loop_control:
+            label: "{{ item.item }}"
+          register: _ent_content
+
+        - name: Remove repos that point at enterprise.proxmox.com
+          # Only files actually referencing the enterprise host are removed; a
+          # user-configured ceph no-subscription/custom-mirror file is kept.
+          when:
+            - not (item is skipped)
+            - "'enterprise.proxmox.com' in (item.content | b64decode)"
+          ansible.builtin.file:
+            path: "{{ item.source }}"
+            state: absent
+          loop: "{{ _ent_content.results }}"
+          loop_control:
+            label: "{{ item.item.item | default('skipped') }}"
 
         - name: Add no-subscription repo
           ansible.builtin.template:

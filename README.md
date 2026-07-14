@@ -10,19 +10,25 @@
 SSH 进你的 PVE 节点(或网页控制台开 Shell),执行——系统名必选(`openwrt` / `chr` / `immortalwrt`):
 
 ```bash
-bash <(curl -fsSL https://ghfast.top/https://raw.githubusercontent.com/alviezhang/pve-softrouter/main/quickstart.sh) openwrt
+bash <(curl -fsSL https://raw.githubusercontent.com/alviezhang/pve-softrouter/main/quickstart.sh) openwrt
+```
+
+国内访问 GitHub 不畅时,可经第三方镜像加速(注意:脚本与仓库会经该代理传输,存在被篡改的理论风险,请自行评估;也可以先下载脚本审阅后再执行):
+
+```bash
+GH_MIRROR=https://ghfast.top/ bash <(curl -fsSL https://ghfast.top/https://raw.githubusercontent.com/alviezhang/pve-softrouter/main/quickstart.sh) openwrt
 ```
 
 需要调整的选项直接跟在后面(`key=value`,透传给 ansible,优先级最高),全程不需要编辑文件:
 
 ```bash
-bash <(curl -fsSL https://ghfast.top/https://raw.githubusercontent.com/alviezhang/pve-softrouter/main/quickstart.sh) chr vm_storage=local-btrfs bridges=vmbr0,vmbr1
+bash <(curl -fsSL https://raw.githubusercontent.com/alviezhang/pve-softrouter/main/quickstart.sh) chr vm_storage=local-btrfs bridges=vmbr0,vmbr1
 ```
 
-海外机器:`GH_MIRROR=`(直连 GitHub)+ `apt_mirror_enabled=false`(不换源):
+海外机器:`apt_mirror_enabled=false`(不换源;GitHub 默认已直连):
 
 ```bash
-GH_MIRROR= bash <(curl -fsSL https://raw.githubusercontent.com/alviezhang/pve-softrouter/main/quickstart.sh) openwrt apt_mirror_enabled=false
+bash <(curl -fsSL https://raw.githubusercontent.com/alviezhang/pve-softrouter/main/quickstart.sh) openwrt apt_mirror_enabled=false
 ```
 
 完成后在 PVE 网页里启动 VM、打开控制台做系统初始化即可。要完全自定义(多台、换版本、改 vmid)用 clone 模式:`git clone` 本仓库,`cp vars.example.yml vars.yml` 编辑后 `make local`(在 PVE 本机)或 `make provision`(远程)。
@@ -91,8 +97,10 @@ ansible-playbook -i your-inventory alviezhang.pve_softrouter.provision -e @vars.
 **下载镜像很慢/失败?** 在 vars.yml 里设 `proxy_url` 走代理;OpenWrt/ImmortalWrt
 官方源国内直连一般可用但速度一般。
 
-**`https://ghfast.top` 失效?** 换任意 GitHub 加速前缀:`GH_MIRROR=https://your-mirror/ bash <(...)`,
-或直连(置空)。
+**GitHub 直连很慢/超时?** 国内机器可加个镜像前缀:`GH_MIRROR=https://ghfast.top/ bash <(...)`
+(须以 `/` 结尾);失效的话换成其它 GitHub 加速前缀,同样须以 `/` 结尾。
+
+**换源没生效?** apt_mirror 只改指向官方 debian.org 的源;已经用其它镜像(阿里云等)的机器不会被二次修改。
 
 **RouterOS CHR 的授权?** CHR 免费跑,未授权时上传限速 1 Mbps,授权在
 MikroTik 官网购买;本项目只负责建 VM。
@@ -101,7 +109,9 @@ MikroTik 官网购买;本项目只负责建 VM。
 LAN IP 默认 `192.168.1.1`,后续配置请参考各系统官方文档。
 
 **会动我现有的 VM 吗?** 不会。同 vmid 且同名 → 跳过(只校正 onboot);同 vmid
-不同名 → 直接报错停止。
+不同名,或同 vmid 同名但缺启动盘(上次中断的半成品),也会报错停止并提示手动清理。
+
+**想删掉重来?** `qm destroy <vmid> --purge 1`(会删除该 VM 及其磁盘),然后重跑。
 
 ## License
 

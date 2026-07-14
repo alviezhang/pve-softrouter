@@ -4,9 +4,9 @@
 # Runs ON the PVE node (uses qm) with become: true. Idempotent: an existing
 # VM (same vmid + name) is left alone except that its onboot flag is
 # enforced. A VM created by this run that then fails mid-provision is rolled
-# back (destroyed) so reruns retry cleanly. Rollback uses
-# --destroy-unreferenced-disks, which also removes pre-existing orphaned
-# vm-<vmid>-disk-* volumes for that vmid.
+# back (destroyed) so reruns retry cleanly. Rollback destroys only the VM
+# and its attached disks; a failed import may leave an unreferenced volume
+# behind — remove it via the storage UI if so.
 #
 # Required:
 #   proxmox_vms: list of VM specs. Each item:

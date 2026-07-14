@@ -18,9 +18,18 @@
   ansible.builtin.assert:
     that:
       # Exact line match (qm config prints "name: <name>"), not substring, so
-      # e.g. "chr-7.21.4-old" does not pass as "chr-7.21.4".
-      - "_vm_cfg.rc != 0 or (('name: ' ~ vm.name) in _vm_cfg.stdout_lines)"
-    fail_msg: "VMID {{ vm.vmid }} already exists but is not {{ vm.name }}."
+      # e.g. "chr-7.21.4-old" does not pass as "chr-7.21.4". The boot-disk key
+      # must exist too: a same-name VM without it is a half-provisioned wreck
+      # from an interrupted run and must not be silently treated as done.
+      - >-
+        _vm_cfg.rc != 0 or
+        ((('name: ' ~ vm.name) in _vm_cfg.stdout_lines) and
+         (_vm_cfg.stdout is search('(?m)^' ~ (vm.disk_bus | regex_escape) ~ ':')))
+    fail_msg: >-
+      VMID {{ vm.vmid }} already exists but is not a complete {{ vm.name }}
+      (different name, or missing its {{ vm.disk_bus }} boot disk from an
+      interrupted run). Inspect it and remove it manually (qm destroy
+      {{ vm.vmid }} --purge 1) before re-running.
     quiet: true
 
 - name: Report VM that would be created (check mode)
@@ -29,6 +38,7 @@
     - ansible_check_mode
   ansible.builtin.debug:
     msg: "Would create VM {{ vm.vmid }} ({{ vm.name }}) from {{ vm.image_url }} on {{ vm_storage }}, disk {{ vm.disk_bus }} {{ vm.disk_size }}"
+  changed_when: true
 
 # check mode cannot simulate the disk download/import (tempfile/command are
 # skipped), so only run the real create flow outside check mode.
@@ -105,7 +115,8 @@
               '--balloon', '0',
               '--bios', 'seabios',
               '--vga', 'std',
-              '--serial0', 'socket']
+              '--serial0', 'socket',
+              '--description', _pvsr_run_tag]
              + _vm_net_args }}
       changed_when: true
 
@@ -141,13 +152,15 @@
       # Destroy only when the vmid now holds a VM with OUR name: a VM created
       # by this run always has it, while a vmid grabbed by someone else during
       # the download window (or never written by a failed qm create) does not.
+      # Rollback now requires our name AND this run's tag, so a concurrent
+      # identical run can never destroy the other's VM.
       when:
         - _vm_create_attempted | default(false) | bool
         - _vm_cfg_rescue.rc == 0
         - "('name: ' ~ vm.name) in _vm_cfg_rescue.stdout_lines"
+        - "('description: ' ~ _pvsr_run_tag) in _vm_cfg_rescue.stdout_lines"
       ansible.builtin.command:
-        argv: [qm, destroy, "{{ vm.vmid }}", --purge, "1", --destroy-unreferenced-disks, "1"]
-      failed_when: false
+        argv: [qm, destroy, "{{ vm.vmid }}", --purge, "1"]
       changed_when: true
 
     - name: Fail after rollback

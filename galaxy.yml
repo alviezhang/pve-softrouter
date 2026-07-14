@@ -1,7 +1,7 @@
 ---
 namespace: alviezhang
 name: pve_softrouter
-version: 1.0.0
+version: 1.1.0
 readme: README.md
 authors:
   - Alvie Zhang (https://github.com/alviezhang)
@@ -26,7 +26,6 @@ build_ignore:
   - Makefile
   - inventory.example.yml
   - inventory.yml
-  - vars.example.yml
   - vars.yml
   - .gitignore
   - .ansible-lint
@@ -34,4 +33,3 @@ build_ignore:
   - .ansible
   - .superpowers
   - .DS_Store
-  - examples
