@@ -7,26 +7,25 @@
 
 ## 快速开始(在 PVE 节点上)
 
-SSH 进你的 PVE 节点(或网页控制台开 Shell),执行:
-
-```bash
-bash <(curl -fsSL https://ghfast.top/https://raw.githubusercontent.com/alviezhang/pve-softrouter/main/quickstart.sh)
-```
-
-知道自己要装哪个系统的话,带上系统名一条命令直达(用内置预设,不用编辑配置):
+一条命令,系统名必选(`openwrt` / `chr` / `immortalwrt`):
 
 ```bash
 bash <(curl -fsSL https://ghfast.top/https://raw.githubusercontent.com/alviezhang/pve-softrouter/main/quickstart.sh) openwrt
 ```
 
-系统名可选 `openwrt` / `chr` / `immortalwrt`;要自定义(双网卡、多台、换版本)就用不带参数的方式。
+需要调整的选项直接跟在后面(`key=value`,透传给 ansible,优先级最高),全程不需要编辑文件:
 
-第一次运行会生成 `/root/pve-softrouter/vars.yml` 并提示你编辑(选择要装的系统、
-存储、网卡);编辑完**重新运行同一条命令**即开始创建 VM。完成后在 PVE 网页里
-启动 VM、打开控制台做系统初始化即可。
+```bash
+bash <(curl -fsSL https://ghfast.top/https://raw.githubusercontent.com/alviezhang/pve-softrouter/main/quickstart.sh) chr vm_storage=local-btrfs bridges=vmbr0,vmbr1
+```
 
-海外机器:`GH_MIRROR= bash <(curl -fsSL https://raw.githubusercontent.com/alviezhang/pve-softrouter/main/quickstart.sh)`,
-并在 vars.yml 里设 `apt_mirror_enabled: false`。
+海外机器:`GH_MIRROR=`(直连 GitHub)+ `apt_mirror_enabled=false`(不换源):
+
+```bash
+GH_MIRROR= bash <(curl -fsSL https://raw.githubusercontent.com/alviezhang/pve-softrouter/main/quickstart.sh) openwrt apt_mirror_enabled=false
+```
+
+完成后在 PVE 网页里启动 VM、打开控制台做系统初始化即可。要完全自定义(多台、换版本、改 vmid)用 clone 模式:`git clone` 本仓库,`cp vars.example.yml vars.yml` 编辑后 `make local`(在 PVE 本机)或 `make provision`(远程)。
 
 ## 从裸机开始(还没装 PVE?)
 

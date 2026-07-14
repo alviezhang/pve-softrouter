@@ -1,6 +1,4 @@
 ---
-# pve-softrouter 配置。cp vars.example.yml vars.yml 后按需修改。
-# 已存在的 vmid(且同名)会自动跳过,可反复执行。
 
 # VM 磁盘所在的 PVE 存储(`pvesm status` 可查;PVE 默认安装就是 local-lvm)
 vm_storage: local-lvm
@@ -18,33 +16,41 @@ vm_storage: local-lvm
 # 内存预检:sum = 假定所有 VM 同时跑(默认)| max = 只跑其中一台 | off = 跳过
 # vm_ram_check: sum
 
-proxmox_vms:
-  - vmid: 901
-    name: openwrt-25.12.4
-    memory: 2048
-    disk_bus: sata0
-    disk_size: "8G"
-    image_url: https://downloads.openwrt.org/releases/25.12.4/targets/x86/64/openwrt-25.12.4-x86-64-generic-squashfs-combined.img.gz
-    archive_format: gz
-    checksum_url: https://downloads.openwrt.org/releases/25.12.4/targets/x86/64/sha256sums
-    onboot: 1
+# 要创建的 VM —— 至少取消注释一个系统(必选,不预设默认)。
+# 已存在的 vmid(且同名)会自动跳过,可反复执行。
+proxmox_vms: []
+# ↑ 取消注释下面任意一个系统示例前,先删掉(或注释掉)上面这行 `proxmox_vms: []`——
+#   一个文件里只能有一个 proxmox_vms: 键,每个示例都自带自己的 proxmox_vms: 键。
 
-  # RouterOS CHR(免费授权限速 1Mbps 上传,需自行购买 license 解锁)
-  # - vmid: 900
-  #   name: chr-7.21.4
-  #   memory: 1024
-  #   disk_bus: virtio0
-  #   disk_size: "4G"
-  #   image_url: https://download.mikrotik.com/routeros/7.21.4/chr-7.21.4.img.zip
-  #   archive_format: zip
-  #   checksum_url: ""
+# proxmox_vms:
+#   - vmid: 901
+#     name: openwrt-25.12.4
+#     memory: 2048
+#     disk_bus: sata0
+#     disk_size: "8G"
+#     image_url: https://downloads.openwrt.org/releases/25.12.4/targets/x86/64/openwrt-25.12.4-x86-64-generic-squashfs-combined.img.gz
+#     archive_format: gz
+#     checksum_url: https://downloads.openwrt.org/releases/25.12.4/targets/x86/64/sha256sums
+#     onboot: 1
 
-  # ImmortalWrt(国内常用的 OpenWrt 分支)
-  # - vmid: 902
-  #   name: immortalwrt-25.12.0
-  #   memory: 2048
-  #   disk_bus: sata0
-  #   disk_size: "8G"
-  #   image_url: https://downloads.immortalwrt.org/releases/25.12.0/targets/x86/64/immortalwrt-25.12.0-x86-64-generic-squashfs-combined.img.gz
-  #   archive_format: gz
-  #   checksum_url: https://downloads.immortalwrt.org/releases/25.12.0/targets/x86/64/sha256sums
+# RouterOS CHR(免费授权限速 1Mbps 上传,需自行购买 license 解锁)
+# proxmox_vms:
+#   - vmid: 900
+#     name: chr-7.21.4
+#     memory: 1024
+#     disk_bus: virtio0
+#     disk_size: "4G"
+#     image_url: https://download.mikrotik.com/routeros/7.21.4/chr-7.21.4.img.zip
+#     archive_format: zip
+#     checksum_url: ""
+
+# ImmortalWrt(国内常用的 OpenWrt 分支)
+# proxmox_vms:
+#   - vmid: 902
+#     name: immortalwrt-25.12.0
+#     memory: 2048
+#     disk_bus: sata0
+#     disk_size: "8G"
+#     image_url: https://downloads.immortalwrt.org/releases/25.12.0/targets/x86/64/immortalwrt-25.12.0-x86-64-generic-squashfs-combined.img.gz
+#     archive_format: gz
+#     checksum_url: https://downloads.immortalwrt.org/releases/25.12.0/targets/x86/64/sha256sums

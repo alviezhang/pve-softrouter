@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# pve-softrouter 一键脚本 —— 在 PVE 节点的 shell 里执行:
-#   bash <(curl -fsSL https://ghfast.top/https://raw.githubusercontent.com/alviezhang/pve-softrouter/main/quickstart.sh)          # 生成 vars.yml,编辑后重跑
-#   bash <(curl -fsSL https://ghfast.top/https://raw.githubusercontent.com/alviezhang/pve-softrouter/main/quickstart.sh) openwrt  # 一步到位(openwrt | chr | immortalwrt)
+# pve-softrouter 一键脚本 —— 在 PVE 节点的 shell 里执行。
+# 用法:
+#   bash <(curl -fsSL https://ghfast.top/https://raw.githubusercontent.com/alviezhang/pve-softrouter/main/quickstart.sh) <openwrt|chr|immortalwrt> [选项=值 ...]
 # 环境变量:
 #   GH_MIRROR  GitHub 加速前缀(须以 / 结尾),默认 https://ghfast.top/;海外机器可置空:GH_MIRROR= bash <(...)
 #   DIR        仓库检出位置,默认 /root/pve-softrouter
@@ -10,15 +10,54 @@ set -euo pipefail
 GH_MIRROR="${GH_MIRROR-https://ghfast.top/}"
 DIR="${DIR:-/root/pve-softrouter}"
 REPO_URL="${GH_MIRROR}https://github.com/alviezhang/pve-softrouter.git"
-PRESET="${1:-}"
 
+usage() {
+  cat <<'EOF'
+用法: bash <(curl -fsSL https://ghfast.top/https://raw.githubusercontent.com/alviezhang/pve-softrouter/main/quickstart.sh) <openwrt|chr|immortalwrt> [选项=值 ...]
+
+示例:
+  ... quickstart.sh) openwrt
+  ... quickstart.sh) chr vm_storage=local-btrfs bridges=vmbr0,vmbr1
+  GH_MIRROR= ... quickstart.sh) openwrt apt_mirror_enabled=false   # 海外:直连 GitHub + 不换源
+
+常用选项(key=value 原样透传给 ansible,优先级最高;完整变量见 README):
+  vm_storage=local-lvm       VM 磁盘所在存储(pvesm status 可查)
+  proxy_url=http://IP:PORT   镜像下载走的 HTTP 代理
+  apt_mirror_enabled=false   海外机器:不换 TUNA 源
+  bridges=vmbr0,vmbr1        网卡桥接,逗号分隔,依次接 net0/net1/...
+
+想完全自定义(多台/改版本/vmid):
+  git clone https://github.com/alviezhang/pve-softrouter.git && cd pve-softrouter
+  cp vars.example.yml vars.yml && nano vars.yml && make local
+EOF
+}
+
+PRESET="${1:-}"
 case "$PRESET" in
-  ""|openwrt|chr|immortalwrt) ;;
-  *)
-    echo "未知系统: $PRESET(可选: openwrt | chr | immortalwrt)" >&2
-    exit 1
-    ;;
+  openwrt|chr|immortalwrt) shift ;;
+  "") : ;;                       # 无系统名:仅当已有 vars.yml 时继续(见下)
+  -h|--help) usage; exit 0 ;;
+  *) echo "未知系统: $PRESET" >&2; echo >&2; usage >&2; exit 1 ;;
 esac
+
+# 其余参数:key=value → ansible --extra-vars;bridges= 转成网卡列表
+EXTRA_ARGS=()
+for kv in "${@}"; do
+  case "$kv" in
+    bridges=*)
+      IFS=',' read -ra _brs <<<"${kv#bridges=}"
+      _json='{"vm_networks_default": ['
+      for i in "${!_brs[@]}"; do
+        [ "$i" -gt 0 ] && _json+=', '
+        _json+="\"virtio,bridge=${_brs[$i]}\""
+      done
+      _json+=']}'
+      EXTRA_ARGS+=(-e "$_json")
+      ;;
+    *=*) EXTRA_ARGS+=(-e "$kv") ;;
+    *) echo "无法识别的参数: $kv(应为 key=value)" >&2; echo >&2; usage >&2; exit 1 ;;
+  esac
+done
 
 if [ "$(id -u)" -ne 0 ]; then
   echo "请以 root 运行(PVE 节点 shell 默认就是 root)" >&2
@@ -44,17 +83,18 @@ cd "$DIR"
 if [ -n "$PRESET" ]; then
   if [ -f vars.yml ]; then
     echo "==> 已存在 $DIR/vars.yml,直接复用(想改用 $PRESET 预设请先: rm $DIR/vars.yml)"
+  elif [ ! -f "examples/$PRESET.yml" ]; then
+    echo "本地仓库缺少 examples/$PRESET.yml(旧版本 checkout?更新失败时请删除 $DIR 重试)" >&2
+    exit 1
   else
     cp "examples/$PRESET.yml" vars.yml
-    echo "==> 使用预设 $PRESET(高级选项见 vars.example.yml / README)"
+    echo "==> 使用预设 $PRESET"
   fi
 elif [ ! -f vars.yml ]; then
-  cp vars.example.yml vars.yml
-  echo
-  echo "已生成 $DIR/vars.yml —— 请编辑它(例如: nano $DIR/vars.yml),"
-  echo "改好后重新运行同一条命令,即开始创建 VM。"
-  echo "(也可以直接带系统名一步到位,例如: bash <(curl ...) openwrt)"
-  exit 0
+  echo "请指定要安装的系统。" >&2
+  echo >&2
+  usage >&2
+  exit 1
 fi
 
-exec ansible-playbook -i 'localhost,' -c local site.yml
+exec ansible-playbook -i 'localhost,' -c local site.yml ${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"}

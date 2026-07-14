@@ -2,7 +2,8 @@
 
 ## Unreleased
 
-- quickstart.sh 支持预设参数(`openwrt` | `chr` | `immortalwrt`):一条命令直达创建,不再必须先编辑 vars.yml。
+- quickstart.sh:系统名改为必选(不再隐式默认 OpenWrt),`-h` 显示用法;其余选项以 `key=value` 透传 ansible(`bridges=vmbr0,vmbr1` 自动展开为网卡列表),一条命令零交互。
+- vars.example.yml:三个系统示例全部注释,由用户显式选择。
 
 ## v1.0.0 (2026-07-13)
 
